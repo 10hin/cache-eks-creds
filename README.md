@@ -18,6 +18,11 @@ Of course, if the cache already expired, call AWS API and get new token.
 >
 > Thank you @buildsville for your helpful article.
 
+> :warning: **Security considerations** :warning:
+> 
+> - Currently, cache-eks-creds stores credentials without protection other than user access control that operating system provides.
+> - Credentials expires 14-15 minuits, and the expiration controled by AWS. But, if attacker is familier to k8s, 10 minuites is enough to take cluster's control.
+
 ## How to use
 
 ### By building from source
