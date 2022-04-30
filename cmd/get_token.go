@@ -16,10 +16,13 @@ import (
 )
 
 const (
-	appCacheDir       = "cache-eks-creds"
-	cliCommandName    = "aws"
-	cliServiceCmdName = "eks"
-	cliActionCmdName  = "get-token"
+	appCacheDir                  = "cache-eks-creds"
+	cliCommandName               = "aws"
+	cliServiceCmdName            = "eks"
+	cliActionCmdName             = "get-token"
+	cliEnvKeyDefaultProfile      = "AWS_DEFAULT_PROFILE"
+	cliEnvKeyProfile             = "AWS_PROFILE"
+	cliFactoryDefaultProfileName = "default"
 )
 
 var (
@@ -41,7 +44,7 @@ func getToken(cmd *cobra.Command) error {
 	var err error
 
 	var profile string
-	profile, err = cmd.Root().PersistentFlags().GetString("profile")
+	profile, err = resolveProfile(cmd)
 	if err != nil {
 		return err
 	}
@@ -74,6 +77,27 @@ func getToken(cmd *cobra.Command) error {
 	return nil
 }
 
+func resolveProfile(cmd *cobra.Command) (string, error) {
+	var err error
+	var profile string
+	profile, err = cmd.Root().PersistentFlags().GetString("profile")
+	if err != nil {
+		return "", err
+	}
+	if profile != "" {
+		return profile, nil
+	}
+	profile = os.Getenv(cliEnvKeyDefaultProfile)
+	if profile != "" {
+		return profile, nil
+	}
+	profile = os.Getenv(cliEnvKeyProfile)
+	if profile != "" {
+		return profile, nil
+	}
+	return cliFactoryDefaultProfileName, nil
+}
+
 func buildCachePath(profile string, clusterName string) (string, error) {
 	var err error
 
@@ -104,8 +128,14 @@ func checkCache(profile string, clusterName string) (string, error) {
 		}
 	}(f)
 
+	// read only for expiration check.
+	// use buf to returning.
+	// because re-encoding will apply unintended case conversion.
+	var buf strings.Builder
+	read := io.TeeReader(f, &buf)
+
 	var execCred clientauthn.ExecCredential
-	err = json.NewDecoder(f).Decode(&execCred)
+	err = json.NewDecoder(read).Decode(&execCred)
 	if err != nil {
 		return "", err
 	}
@@ -116,13 +146,7 @@ func checkCache(profile string, clusterName string) (string, error) {
 		return "", fmt.Errorf("cached credential already expired")
 	}
 
-	builder := &strings.Builder{}
-	err = json.NewEncoder(builder).Encode(execCred)
-	if err != nil {
-		return "", err
-	}
-
-	return builder.String(), nil
+	return buf.String(), nil
 }
 
 func executeAWSCLI(cmd *cobra.Command) (string, error) {
