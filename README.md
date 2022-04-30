@@ -12,8 +12,10 @@ This command works as wrapper of aws-cli, and cache token to file.
 If the cache not expired, return it to kubectl.
 Of course, if the cache already expired, call AWS API and get new token.
 
-> Above idea based on following article
-> [[EKS] kubectlを高速化する - Qiita](https://qiita.com/masahata/items/e76ed2c91eeaa095d7c7)
+> Above idea based on following article:
+>
+> - [[EKS] kubectlを高速化する - Qiita](https://qiita.com/masahata/items/e76ed2c91eeaa095d7c7)
+>
 > Thank you @buildsville for your helpful article.
 
 ## How to use

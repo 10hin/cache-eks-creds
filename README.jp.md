@@ -13,7 +13,9 @@ EKSを使うと `kubectl` コマンドが遅くなりますが、それはクラ
 もちろん、すでにキャッシュが期限切れしていれば、AWS APIを呼び出して新しいトークンを取得します。
 
 > 上記のアイディアは以下の記事を参考にさせていただきました
-> [[EKS] kubectlを高速化する - Qiita](https://qiita.com/masahata/items/e76ed2c91eeaa095d7c7)
+>
+> - [[EKS] kubectlを高速化する - Qiita](https://qiita.com/masahata/items/e76ed2c91eeaa095d7c7)
+>
 > @buildsville さんに、ここでお礼を申し上げます。有益な記事をありがとうございます。
 
 ## 使い方
