@@ -4,13 +4,19 @@ import (
 	"context"
 	"fmt"
 	"github.com/10hin/cache-eks-creds/cmd"
+	"github.com/10hin/cache-eks-creds/pkg/cache"
 	"os"
 	"os/signal"
 	"syscall"
 )
 
 func main() {
-	ctx, cancel := context.WithCancel(context.Background())
+	emptyCtx := context.Background()
+	ctxWithComponents := storeComponents(emptyCtx, map[string]interface{}{
+		"github.com/10hin/cache-eks-creds/pkg/cache.CredentialCache": cache.NewFileCache(),
+	})
+
+	ctx, cancel := context.WithCancel(ctxWithComponents)
 	defer cancel()
 
 	sigChan := make(chan os.Signal, 0)
@@ -32,4 +38,16 @@ func main() {
 		panic(fmt.Errorf("interrpted"))
 	case <-complete:
 	}
+}
+
+func storeComponents(ctx context.Context, components map[string]interface{}) context.Context {
+	var newCtx context.Context = nil
+	for key, comp := range components {
+		if newCtx == nil {
+			newCtx = context.WithValue(ctx, key, comp)
+		} else {
+			newCtx = context.WithValue(newCtx, key, comp)
+		}
+	}
+	return newCtx
 }

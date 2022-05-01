@@ -2,17 +2,13 @@ package cmd
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
+	"github.com/10hin/cache-eks-creds/pkg/cache"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"io"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	clientauthn "k8s.io/client-go/pkg/apis/clientauthentication"
 	"os"
 	"os/exec"
-	"path/filepath"
-	"strings"
 )
 
 const (
@@ -43,6 +39,8 @@ func init() {
 func getToken(cmd *cobra.Command) error {
 	var err error
 
+	cacheStore := cmd.Context().Value("github.com/10hin/cache-eks-creds/pkg/cache.CredentialCache").(cache.CredentialCache)
+
 	var profile string
 	profile, err = resolveProfile(cmd)
 	if err != nil {
@@ -55,7 +53,7 @@ func getToken(cmd *cobra.Command) error {
 	}
 
 	var cacheContent string
-	cacheContent, err = checkCache(profile, clusterName)
+	cacheContent, err = cacheStore.Check(profile, clusterName)
 	if err == nil {
 		fmt.Println(cacheContent)
 		return nil
@@ -68,7 +66,7 @@ func getToken(cmd *cobra.Command) error {
 
 	fmt.Println(execResult)
 
-	err = updateCache(profile, clusterName, execResult)
+	err = cacheStore.Update(profile, clusterName, execResult)
 	if err != nil {
 		fmt.Printf("Warning: error happend whild updating cache: %#v\n", err)
 		// do not return error
@@ -96,57 +94,6 @@ func resolveProfile(cmd *cobra.Command) (string, error) {
 		return profile, nil
 	}
 	return cliFactoryDefaultProfileName, nil
-}
-
-func buildCachePath(profile string, clusterName string) (string, error) {
-	var err error
-
-	userCacheDir, err := os.UserCacheDir()
-	if err != nil {
-		return "", err
-	}
-
-	return filepath.Clean(fmt.Sprintf("%s/%s/%s/%s", userCacheDir, appCacheDir, profile, clusterName)), nil
-
-}
-
-func checkCache(profile string, clusterName string) (string, error) {
-	cachePath, err := buildCachePath(profile, clusterName)
-	if err != nil {
-		return "", err
-	}
-
-	var f *os.File
-	f, err = os.Open(cachePath)
-	if err != nil {
-		return "", err
-	}
-	defer func(f1 *os.File) {
-		err1 := f1.Close()
-		if err1 != nil {
-			fmt.Printf("error when cache file closing: %#v\n", err)
-		}
-	}(f)
-
-	// read only for expiration check.
-	// use buf to returning.
-	// because re-encoding will apply unintended case conversion.
-	var buf strings.Builder
-	read := io.TeeReader(f, &buf)
-
-	var execCred clientauthn.ExecCredential
-	err = json.NewDecoder(read).Decode(&execCred)
-	if err != nil {
-		return "", err
-	}
-
-	now := metav1.Now()
-	expire := execCred.Status.ExpirationTimestamp
-	if expire.Before(&now) {
-		return "", fmt.Errorf("cached credential already expired")
-	}
-
-	return buf.String(), nil
 }
 
 func executeAWSCLI(cmd *cobra.Command) (string, error) {
@@ -262,32 +209,4 @@ func executeAWSCLI(cmd *cobra.Command) (string, error) {
 	}
 
 	return cliStdout.String(), nil
-}
-
-func updateCache(profile string, clusterName string, result string) error {
-	cachePath, err := buildCachePath(profile, clusterName)
-	if err != nil {
-		return err
-	}
-
-	cacheDir := filepath.Dir(cachePath)
-	err = os.MkdirAll(cacheDir, 0700)
-	if err != nil {
-		return err
-	}
-
-	var f *os.File
-	f, err = os.OpenFile(cachePath, os.O_RDWR|os.O_CREATE, 0600)
-	if err != nil {
-		return err
-	}
-	defer func(f1 *os.File) {
-		err1 := f1.Close()
-		if err1 != nil {
-			fmt.Printf("error when cache file closing: %#v\n", err)
-		}
-	}(f)
-
-	_, err = f.WriteString(result)
-	return err
 }
