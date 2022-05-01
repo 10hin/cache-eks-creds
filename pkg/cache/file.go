@@ -15,26 +15,28 @@ const (
 	appCacheDir = "cache-eks-creds"
 )
 
-type fileCache struct{}
-
-func NewFileCache() CredentialCache {
-	return &fileCache{}
+type fileCache struct {
+	CacheRootPath string
 }
 
-func buildCachePath(profile, clusterName string) (string, error) {
-	var err error
-
+func NewFileCache() CredentialCache {
 	userCacheDir, err := os.UserCacheDir()
 	if err != nil {
-		return "", err
+		panic(err)
 	}
 
-	return filepath.Clean(fmt.Sprintf("%s/%s/%s/%s", userCacheDir, appCacheDir, profile, clusterName)), nil
+	return &fileCache{
+		CacheRootPath: filepath.Clean(userCacheDir + "/" + appCacheDir),
+	}
+}
+
+func (c *fileCache) buildCachePath(profile, clusterName string) (string, error) {
+	return filepath.Clean(fmt.Sprintf("%s/%s/%s", c.CacheRootPath, profile, clusterName)), nil
 
 }
 
 func (c *fileCache) Check(profile, clusterName string) (string, error) {
-	cachePath, err := buildCachePath(profile, clusterName)
+	cachePath, err := c.buildCachePath(profile, clusterName)
 	if err != nil {
 		return "", err
 	}
@@ -73,7 +75,7 @@ func (c *fileCache) Check(profile, clusterName string) (string, error) {
 }
 
 func (c *fileCache) Update(profile, clusterName string, result string) error {
-	cachePath, err := buildCachePath(profile, clusterName)
+	cachePath, err := c.buildCachePath(profile, clusterName)
 	if err != nil {
 		return err
 	}
@@ -101,7 +103,7 @@ func (c *fileCache) Update(profile, clusterName string, result string) error {
 }
 
 func (c *fileCache) Clear(profile, clusterName string) error {
-	cachePath, err := buildCachePath(profile, clusterName)
+	cachePath, err := c.buildCachePath(profile, clusterName)
 	if err != nil {
 		return err
 	}
