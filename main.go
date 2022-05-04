@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/10hin/cache-eks-creds/cmd"
 	"github.com/10hin/cache-eks-creds/pkg/cache"
+	"github.com/10hin/cache-eks-creds/pkg/kubeconfig_resolver"
 	"github.com/10hin/cache-eks-creds/pkg/profile_resolver"
 	"os"
 	"os/signal"
@@ -14,8 +15,9 @@ import (
 func main() {
 	emptyCtx := context.Background()
 	ctxWithComponents := storeComponents(emptyCtx, map[string]interface{}{
-		cache.Key:            cache.NewFileCache(),
-		profile_resolver.Key: profile_resolver.NewProfileResolver(),
+		cache.Key:               cache.NewFileCache(),
+		profile_resolver.Key:    profile_resolver.NewProfileResolver(),
+		kubeconfig_resolver.Key: kubeconfig_resolver.NewKubeconfigResolver(),
 	})
 
 	ctx, cancel := context.WithCancel(ctxWithComponents)

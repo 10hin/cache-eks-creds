@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"github.com/10hin/cache-eks-creds/pkg/kubeconfig_resolver"
 	"github.com/10hin/cache-eks-creds/pkg/profile_resolver"
 	"github.com/spf13/cobra"
 )
@@ -10,9 +11,23 @@ var (
 	rootCmd = &cobra.Command{
 		Use: "cache-eks-creds",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			resolver := cmd.Context().Value(profile_resolver.Key).(*profile_resolver.ProfileResolver)
-			resolver.SetFlagHolder(cmd)
-			return resolver.Resolve()
+			var err error
+
+			profileResolver := cmd.Context().Value(profile_resolver.Key).(*profile_resolver.ProfileResolver)
+			profileResolver.SetFlagHolder(cmd)
+			err = profileResolver.Resolve()
+			if err != nil {
+				return err
+			}
+
+			kubeconfigResolver := cmd.Context().Value(kubeconfig_resolver.Key).(kubeconfig_resolver.KubeconfigResolver)
+			kubeconfigResolver.SetFlagHolder(cmd)
+			err = kubeconfigResolver.Resolve()
+			if err != nil {
+				return err
+			}
+
+			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cmd.Help()
@@ -40,6 +55,8 @@ func init() {
 	rootCmd.PersistentFlags().String("ca-bandle", "", "The CA certificate bundle to use when verifying SSL certificates. Overrides config/env settings.")
 	rootCmd.PersistentFlags().Int("cli-read-timeout", -1, "The maximum socket read time in seconds. If the value is set to 0, the socket read will be blocking and not timeout. The default value is 60 seconds.")
 	rootCmd.PersistentFlags().Int("cli-connect-timeout", -1, "The maximum socket connect time in seconds. If the value is set to 0, the socket connect will be blocking and not timeout. The default value is 60 seconds.")
+	// flags compatible to kubectl
+	rootCmd.PersistentFlags().String("kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
 
 	rootCmd.AddCommand(eksCmd)
 	rootCmd.AddCommand(deleteCmd)
