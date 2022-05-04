@@ -73,6 +73,31 @@ func TestFileCache_CheckSucceedsWithCacheFile(t *testing.T) {
 	}
 }
 
+func TestFileCache_CheckFailsWithExpiredCache(t *testing.T) {
+	cacheStore := newFileCacheForTest()
+
+	profile := "test-profile"
+	clusterName := "test-cluster"
+	cacheFilePath := filepath.Clean(fmt.Sprintf(
+		"%s/%s/%s",
+		cacheStore.CacheRootPath,
+		profile,
+		clusterName,
+	))
+	// use content expired before 15min
+	result := prepareCredentialContent(metav1.NewTime(metav1.Now().Add(-15*time.Minute)), "")
+	prepareFileWithContent(
+		cacheFilePath,
+		result,
+		0755,
+	)
+
+	_, err := cacheStore.Check(profile, clusterName)
+	if err == nil {
+		t.Fatal("expected Check fails, but in actual, succeeds")
+	}
+}
+
 func prepareCredentialContent(expires metav1.Time, token string) string {
 	expiresBytes, err := expires.MarshalText()
 	if err != nil {
