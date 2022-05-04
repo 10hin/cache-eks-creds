@@ -43,4 +43,5 @@ func init() {
 
 	rootCmd.AddCommand(eksCmd)
 	rootCmd.AddCommand(deleteCmd)
+	rootCmd.AddCommand(kubeconfigCmd)
 }
