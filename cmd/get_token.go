@@ -4,21 +4,18 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/10hin/cache-eks-creds/pkg/cache"
+	"github.com/10hin/cache-eks-creds/pkg/profile_resolver"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"io"
-	"os"
 	"os/exec"
 )
 
 const (
-	appCacheDir                  = "cache-eks-creds"
-	cliCommandName               = "aws"
-	cliServiceCmdName            = "eks"
-	cliActionCmdName             = "get-token"
-	cliEnvKeyDefaultProfile      = "AWS_DEFAULT_PROFILE"
-	cliEnvKeyProfile             = "AWS_PROFILE"
-	cliFactoryDefaultProfileName = "default"
+	appCacheDir       = "cache-eks-creds"
+	cliCommandName    = "aws"
+	cliServiceCmdName = "eks"
+	cliActionCmdName  = "get-token"
 )
 
 var (
@@ -39,13 +36,14 @@ func init() {
 func getToken(cmd *cobra.Command) error {
 	var err error
 
-	cacheStore := cmd.Context().Value("github.com/10hin/cache-eks-creds/pkg/cache.CredentialCache").(cache.CredentialCache)
+	cacheStore := cmd.Context().Value(cache.Key).(cache.CredentialCache)
 
-	var profile string
-	profile, err = resolveProfile(cmd)
+	profileResolver := cmd.Context().Value(profile_resolver.Key).(*profile_resolver.ProfileResolver)
+	profile, err := profileResolver.Profile()
 	if err != nil {
-		return err
+		panic(err)
 	}
+
 	var clusterName string
 	clusterName, err = cmd.PersistentFlags().GetString("cluster-name")
 	if err != nil {
@@ -73,27 +71,6 @@ func getToken(cmd *cobra.Command) error {
 	}
 
 	return nil
-}
-
-func resolveProfile(cmd *cobra.Command) (string, error) {
-	var err error
-	var profile string
-	profile, err = cmd.Root().PersistentFlags().GetString("profile")
-	if err != nil {
-		return "", err
-	}
-	if profile != "" {
-		return profile, nil
-	}
-	profile = os.Getenv(cliEnvKeyDefaultProfile)
-	if profile != "" {
-		return profile, nil
-	}
-	profile = os.Getenv(cliEnvKeyProfile)
-	if profile != "" {
-		return profile, nil
-	}
-	return cliFactoryDefaultProfileName, nil
 }
 
 func executeAWSCLI(cmd *cobra.Command) (string, error) {

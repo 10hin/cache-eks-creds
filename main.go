@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/10hin/cache-eks-creds/cmd"
 	"github.com/10hin/cache-eks-creds/pkg/cache"
+	"github.com/10hin/cache-eks-creds/pkg/profile_resolver"
 	"os"
 	"os/signal"
 	"syscall"
@@ -13,7 +14,8 @@ import (
 func main() {
 	emptyCtx := context.Background()
 	ctxWithComponents := storeComponents(emptyCtx, map[string]interface{}{
-		"github.com/10hin/cache-eks-creds/pkg/cache.CredentialCache": cache.NewFileCache(),
+		cache.Key:            cache.NewFileCache(),
+		profile_resolver.Key: profile_resolver.NewProfileResolver(),
 	})
 
 	ctx, cancel := context.WithCancel(ctxWithComponents)
