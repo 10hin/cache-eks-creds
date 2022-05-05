@@ -1,12 +1,12 @@
 package cmd
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/10hin/cache-eks-creds/pkg/kubeconfig_resolver"
-	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
+	"gopkg.in/yaml.v2"
 	"io"
 	apiv1 "k8s.io/client-go/tools/clientcmd/api/v1"
 	"os"
@@ -57,22 +57,11 @@ func listKubeconfigUser(cmd *cobra.Command) error {
 	if err != nil {
 		return fmt.Errorf("failed to open file: %s: %w", kubeconfigPath, err)
 	}
-	var b bytes.Buffer
-	_, err = io.Copy(&b, f)
-	if err != nil {
-		return fmt.Errorf("failed to copy kubeconfig to buffer: %w", err)
-	}
 
-	var jsonBytes []byte
-	jsonBytes, err = yaml.YAMLToJSON(b.Bytes())
+	var kubeconfig *apiv1.Config
+	kubeconfig, err = readKubeconfig(f)
 	if err != nil {
-		//return fmt.Errorf("failed to re-encode to json (source: %#v): %w", jsonTree, err)
-		return fmt.Errorf("failed to re-encode to json (source: %s): %w", b.String(), err)
-	}
-	var kubeconfig apiv1.Config
-	err = json.Unmarshal(jsonBytes, &kubeconfig)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal kubeconfig: %w", err)
+		return fmt.Errorf("failed to decode kubeconfig: %w", err)
 	}
 
 	optionAll, err := cmd.Flags().GetBool("all")
@@ -166,4 +155,34 @@ func (c Command) String() string {
 	}
 
 	return fmt.Sprintf("'%s'", strings.Join(c, "' '"))
+}
+
+func readKubeconfig(r io.Reader) (*apiv1.Config, error) {
+	var err error
+
+	var obj interface{}
+	err = yaml.NewDecoder(r).Decode(&obj)
+	if err != nil {
+		return nil, err
+	}
+
+	pipeOut, pipeIn := io.Pipe()
+	eg := &errgroup.Group{}
+	eg.Go(func() error {
+		return json.NewEncoder(pipeIn).Encode(&obj)
+	})
+	res := make(chan *apiv1.Config, 1)
+	eg.Go(func() error {
+		dec := new(apiv1.Config)
+		var err1 error
+		err1 = json.NewDecoder(pipeOut).Decode(dec)
+		res <- dec
+		return err1
+	})
+
+	err = eg.Wait()
+	if err != nil {
+		return nil, err
+	}
+	return <-res, nil
 }
