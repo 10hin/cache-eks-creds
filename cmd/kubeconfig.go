@@ -8,7 +8,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v2"
 	"io"
-	apiv1 "k8s.io/client-go/tools/clientcmd/api/v1"
+	apiV1 "k8s.io/client-go/tools/clientcmd/api/v1"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,7 +19,7 @@ var (
 	kubeconfigCmd = &cobra.Command{
 		Use: "kubeconfig",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return fmt.Errorf("not implemented yet") // TODO implement
+			return cmd.Help()
 		},
 	}
 )
@@ -52,14 +52,8 @@ func listKubeconfigUser(cmd *cobra.Command) error {
 		return err
 	}
 
-	var f *os.File
-	f, err = os.Open(kubeconfigPath)
-	if err != nil {
-		return fmt.Errorf("failed to open file: %s: %w", kubeconfigPath, err)
-	}
-
-	var kubeconfig *apiv1.Config
-	kubeconfig, err = readKubeconfig(f)
+	var kubeconfig *apiV1.Config
+	kubeconfig, err = readKubeconfig(kubeconfigPath)
 	if err != nil {
 		return fmt.Errorf("failed to decode kubeconfig: %w", err)
 	}
@@ -157,11 +151,23 @@ func (c Command) String() string {
 	return fmt.Sprintf("'%s'", strings.Join(c, "' '"))
 }
 
-func readKubeconfig(r io.Reader) (*apiv1.Config, error) {
+func readKubeconfig(kubeconfigPath string) (*apiV1.Config, error) {
 	var err error
 
+	var f *os.File
+	f, err = os.Open(kubeconfigPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file: %s: %w", kubeconfigPath, err)
+	}
+	defer func(f1 *os.File) {
+		err1 := f1.Close()
+		if err1 != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "failed to close file: %#v", err1)
+		}
+	}(f)
+
 	var obj interface{}
-	err = yaml.NewDecoder(r).Decode(&obj)
+	err = yaml.NewDecoder(f).Decode(&obj)
 	if err != nil {
 		return nil, err
 	}
@@ -171,9 +177,9 @@ func readKubeconfig(r io.Reader) (*apiv1.Config, error) {
 	eg.Go(func() error {
 		return json.NewEncoder(pipeIn).Encode(&obj)
 	})
-	res := make(chan *apiv1.Config, 1)
+	res := make(chan *apiV1.Config, 1)
 	eg.Go(func() error {
-		dec := new(apiv1.Config)
+		dec := new(apiV1.Config)
 		var err1 error
 		err1 = json.NewDecoder(pipeOut).Decode(dec)
 		res <- dec
