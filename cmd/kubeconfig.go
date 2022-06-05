@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/10hin/cache-eks-creds/pkg/kubeconfig_resolver"
+	"github.com/10hin/cache-eks-creds/pkg/write_rename"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 	"io"
@@ -121,13 +122,13 @@ func listKubeconfigUser(cmd *cobra.Command) error {
 			_, _ = fmt.Fprintln(os.Stderr, err1)
 		}
 	}(w)
-	_, err = fmt.Fprintln(w, "NAME\tIS EXEC\tCOMMAND\tCACHED")
+	_, err = fmt.Fprintln(w, "NAME\tIS EXEC\tCACHED\tCOMMAND")
 	if err != nil {
 		return err
 	}
 	for _, c := range candidates {
 
-		_, err = fmt.Fprintf(w, "%s\t%t\t%s\t%s\n", c.Name, c.IsExec, c.Command, c.IsCached)
+		_, err = fmt.Fprintf(w, "%s\t%t\t%s\t%s\n", c.Name, c.IsExec, c.IsCached, c.Command)
 	}
 
 	return nil
@@ -136,8 +137,8 @@ func listKubeconfigUser(cmd *cobra.Command) error {
 type User struct {
 	Name     string
 	IsExec   bool
-	Command  Command
 	IsCached Cached
+	Command  Command
 }
 
 type Cached string
@@ -166,22 +167,20 @@ func readKubeconfig(kubeconfigPath string) (*apiV1.Config, error) {
 	var err error
 
 	var yamlBuffer bytes.Buffer
-	func() {
-		var f *os.File
-		f, err = os.Open(kubeconfigPath)
-		if err != nil {
-			err = fmt.Errorf("failed to open file: %s: %w", kubeconfigPath, err)
-			return
-		}
-		defer func(f1 *os.File) {
-			err1 := f1.Close()
-			if err1 != nil {
-				_, _ = fmt.Fprintf(os.Stderr, "failed to close file: %#v", err1)
-			}
-		}(f)
 
-		_, err = io.Copy(&yamlBuffer, f)
-	}()
+	var f *os.File
+	f, err = os.Open(kubeconfigPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file: %s: %w", kubeconfigPath, err)
+	}
+	defer func(f1 *os.File) {
+		err1 := f1.Close()
+		if err1 != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "failed to close file: %#v", err1)
+		}
+	}(f)
+
+	_, err = io.Copy(&yamlBuffer, f)
 	if err != nil {
 		return nil, err
 	}
@@ -205,14 +204,14 @@ func readKubeconfig(kubeconfigPath string) (*apiV1.Config, error) {
 
 var (
 	kubeconfigUpdateCmd = &cobra.Command{
-		Use:  "update",
+		Use:  "update [--disable] name [names...]",
 		RunE: updateKubeconfig,
 		Args: cobra.MinimumNArgs(1),
 	}
 )
 
 func init() {
-	kubeconfigUpdateCmd.Flags().Bool("disable", false, "")
+	kubeconfigUpdateCmd.Flags().Bool("disable", false, "Disable caching of credentials.")
 }
 
 func updateKubeconfig(cmd *cobra.Command, names []string) error {
@@ -240,7 +239,7 @@ func updateKubeconfig(cmd *cobra.Command, names []string) error {
 		commandUpdateFrom = "cache-eks-creds"
 	}
 
-	var nameSet map[string]struct{}
+	nameSet := make(map[string]struct{})
 	for _, name := range names {
 		nameSet[name] = struct{}{}
 	}
@@ -311,27 +310,5 @@ func writeKubeconfig(path string, kubeconfig *apiV1.Config) error {
 		return err
 	}
 
-	// To be atomic while writing kubeconfig,
-	// write temporary file and rename it to path
-	var f *os.File
-	f, err = os.CreateTemp(filepath.Dir(path), filepath.Base(path))
-	if err != nil {
-		return err
-	}
-	defer func(f1 *os.File) {
-		err1 := f1.Close()
-		if err1 != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "failed to close temp file: %#v\n", err)
-		}
-	}(f)
-
-	_, err = io.Copy(f, &yamlBuf)
-	if err != nil {
-		return err
-	}
-
-	err = os.Rename(f.Name(), path)
-
-	return err
-
+	return write_rename.WriteRename(path, &yamlBuf)
 }

@@ -25,6 +25,11 @@ func WriteRename(filePath string, content io.Reader) error {
 		return err
 	}
 
+	err = f.Close()
+	if err != nil {
+		return err
+	}
+
 	return os.Rename(tempFileName, filePath)
 
 }
