@@ -29,9 +29,7 @@ var (
 
 			return nil
 		},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return cmd.Help()
-		},
+		RunE: showHelpE,
 	}
 )
 
@@ -61,4 +59,8 @@ func init() {
 	rootCmd.AddCommand(eksCmd)
 	rootCmd.AddCommand(deleteCmd)
 	rootCmd.AddCommand(kubeconfigCmd)
+}
+
+func showHelpE(cmd *cobra.Command, args []string) error {
+	return cmd.Help()
 }
