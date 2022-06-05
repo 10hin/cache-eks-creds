@@ -3,12 +3,14 @@ package cache
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/10hin/cache-eks-creds/pkg/write_rename"
 	"io"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	clientauthn "k8s.io/client-go/pkg/apis/clientauthentication"
 	"os"
 	"path/filepath"
 	"strings"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientauthn "k8s.io/client-go/pkg/apis/clientauthentication"
 )
 
 const (
@@ -86,20 +88,7 @@ func (c *fileCache) Update(profile, clusterName string, result string) error {
 		return err
 	}
 
-	var f *os.File
-	f, err = os.OpenFile(cachePath, os.O_RDWR|os.O_CREATE, 0600)
-	if err != nil {
-		return err
-	}
-	defer func(f1 *os.File) {
-		err1 := f1.Close()
-		if err1 != nil {
-			fmt.Printf("error when cache file closing: %#v\n", err)
-		}
-	}(f)
-
-	_, err = f.WriteString(result)
-	return err
+	return write_rename.WriteRename(cachePath, strings.NewReader(result))
 }
 
 func (c *fileCache) Clear(profile, clusterName string) error {
