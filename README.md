@@ -2,6 +2,13 @@
 
 Speed up your `kubectl` with EKS cluster
 
+> **Maintenance mode**
+>
+> This project will archive.
+>
+> Current version of aws-cli caches `get-token` call result itself.
+> Please upgrade aws-cli.
+
 ## What is this
 
 Using EKS may slow down your `kubectl` command because not latency for communicating with clouds, but authentication mechanism.
